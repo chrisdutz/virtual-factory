@@ -48,11 +48,11 @@ This is extended by the following IO modules:
 - two `750-637/000-002`: Optical encoder modules
 - `750-600`: Terminator module
 
+![PLC](images/plc.jpg "PLC")
+
 Here I should mention that initially I purchased:
 - `750-403`: 4-channel fast digital input
 - `750-459`: 4-channel analog input
-
-![PLC](images/plc.jpg "PLC")
 
 The analog input, was simply because Fischertechnik advertised the need of an analog input in the specs.
 This seems to have been related to a rudimentary bar-code-scanner, that initially was located in the ingestion tunnel of the factory.
