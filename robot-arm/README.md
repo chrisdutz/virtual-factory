@@ -152,14 +152,14 @@ M91: The initialization is in progress
 To simplify reading and understanding the ladder program the markers `M00` to `M79` control the outputs. 
 The last digit of the marker directly maps to the output number. So `M34` controls output `Y4`. 
 
-M{x}0: Raise the arm
-M{x}1: Lower the arm
-M{x}2: Retract the arm
-M{x}3: Extend the arm
-M{x}4: Rotate the arm clockwise
-M{x}5: Rotate the arm counterclockwise
-M{x}6: Turn on the compressor
-M{x}7: Open the valve
+- M{x}0: Raise the arm
+- M{x}1: Lower the arm
+- M{x}2: Retract the arm
+- M{x}3: Extend the arm
+- M{x}4: Rotate the arm clockwise
+- M{x}5: Rotate the arm counterclockwise
+- M{x}6: Turn on the compressor
+- M{x}7: Open the valve
 
 ## Sub Programms
 
@@ -184,6 +184,21 @@ In this ladder program you can also see, how the initialisation sub programm is 
 Whenever the PLC is started, we need to ensure the arm is initialized, by moving it to the home position.
 
 ![Initialization](images/initialization.png "Initialization")
+
+So when starting, all markers are set to 0, so on first execution of the ladder logic, `M90` is `false`, and I'm therefore setting it to `true`, but at the same time, I'm also setting `M91` to true, which indicates: We're initializing.
+This ensures that we trigger initialization only once on startup and this is done automatically.
+
+In the `Network` `N002` you can then see: 
+
+- As long as we're still initializing (`M91` is `true`) and we haven't reached the vertical top reference switch position, set `M0` to true.
+- As soon as the top reference switch is pressed, turn off `M0`
+- Now we're in the row below, as `X3` will stay `true` and here we repeat the same procedure: As long as the horizontal reference switch is not pressed (`true` ... this is when the arm is completely retracted), turn on the `M2` motor and turn it off as soon as we reach the reference position.
+- Last not least, turn the robot arm clockwise till we reach the rotational reference position (`X11`).
+- As soon as we've also reached the rotational reference position, reset the initialization marker `M91`.
+- The system is finished initializing.
+
+NOTE: I have read that it's not good to use "set" and "reset" of coils, I would be happy for some feedback on how to do it without. 
+WinProLadder is constantly giving out warnings that two ladders are referencing the same coil.
 
 ## Positions
 
