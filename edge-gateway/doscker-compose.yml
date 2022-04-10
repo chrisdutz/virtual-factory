@@ -1,0 +1,20 @@
+version: '2.1'
+networks: {}
+volumes:
+    resin-data: {}
+    settings:
+services:
+    browser:
+        image: balenablocks/browser
+        privileged: true
+        network_mode: host
+        ports:
+            - '5011'
+            - '35173'
+        volumes:
+            - 'settings:/data'
+        entrypoint:
+            - LAUNCH_URL: ''
+
+
+
