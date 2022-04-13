@@ -40,27 +40,27 @@ Here's how I connected all inputs and outputs to the PLC
 
 (The connections X0 to X11 are important that they are exactly as mentioned here. See why, in the configuration part)
 
-X0: Signal A of the optical encoder for vertical axis (Raise/lower the Arm)
-X1: Signal B of the optical encoder for vertical axis (Raise/lower the Arm)
-X3: Reference switch vertical axis
-X4: Signal A of the optical encoder for horizontal axis (Extend/retract the arm)
-X5: Signal B of the optical encoder for horizontal axis (Extend/retract the arm)
-X7: Reference switch horizontal axis
-X8: Signal A of the optical encoder for rotational axis (Turn the Arm clockwise/anticlockwise)
-X9: Signal B of the optical encoder for rotational axis (Turn the Arm clockwise/anticlockwise)
-X11: Reference switch rotational axis
-X12: Vacuum detection
+- X0: Signal A of the optical encoder for vertical axis (Raise/lower the Arm)
+- X1: Signal B of the optical encoder for vertical axis (Raise/lower the Arm)
+- X3: Reference switch vertical axis
+- X4: Signal A of the optical encoder for horizontal axis (Extend/retract the arm)
+- X5: Signal B of the optical encoder for horizontal axis (Extend/retract the arm)
+- X7: Reference switch horizontal axis
+- X8: Signal A of the optical encoder for rotational axis (Turn the Arm clockwise/anticlockwise)
+- X9: Signal B of the optical encoder for rotational axis (Turn the Arm clockwise/anticlockwise)
+- X11: Reference switch rotational axis
+- X12: Vacuum detection
 
 ### Outputs
 
-Y0: Motor vertical up
-Y1: Motor vertical down
-Y2: Motor horizontal retract
-Y3: Motor horizontal extend
-Y4: Motor rotate clockwise
-Y5: Motor rotate counterclockwise
-Y6: Compressor
-Y7: Valve vacuum
+- Y0: Motor vertical up
+- Y1: Motor vertical down
+- Y2: Motor horizontal retract
+- Y3: Motor horizontal extend
+- Y4: Motor rotate clockwise
+- Y5: Motor rotate counterclockwise
+- Y6: Compressor
+- Y7: Valve vacuum
 
 # Configuration of the PLC
 
@@ -87,6 +87,9 @@ My FBs-40MC has 4 hardware counters included, however the inputs need to be conn
 Each of them stores the current position in a pre-defined register.
 These are also readable via modbus.
 
+A full description of the memory layout can be found here:
+https://www.esea.cz/support/fatek/doc/FBs-Manual_Web_English/FBs-Special-Relay-Register-List-EN.pdf
+
 These are configured in the `System Configuration` / `I/O Configuration` tab, on the `Timer/Counter` tab. 
 I configured them by selecting the sub-tabs: `HSC0`, `HSC1` and `HSC2` and setting them the following way.
 
@@ -100,7 +103,7 @@ B-Phase set to: `X1`
 Mask(MSK) left unassigned
 Clear(CLR) set to: `X3`
 
-The output register: `R4096`
+The output register: `R4096` (Hex 1000)
 PLC4X-compatible Modbus address: `404096`
 
 So the encoder signals are connected to the inputs X0 and X1, while the signal of the home-switch is connected to X3.
@@ -113,7 +116,7 @@ B-Phase set to: X5
 Mask(MSK) left unassigned
 Clear(CLR) set to: X7
 
-The output register: `R4100`
+The output register: `R4100` (Hex 1004)
 PLC4X-compatible Modbus address: `404100`
 
 ### MSC2 (Rotate clockwise/counterclockwise)
@@ -124,7 +127,7 @@ B-Phase set to: X9
 Mask(MSK) left unassigned
 Clear(CLR) set to: X11
 
-The output register: `R4104`
+The output register: `R4104` (Hex 1008)
 PLC4X-compatible Modbus address: `404104`
 
 ### Enable the Hardware counters
@@ -185,12 +188,14 @@ Whenever the PLC is started, we need to ensure the arm is initialized, by moving
 
 ![Initialization](images/initialization.png "Initialization")
 
-So when starting, all markers are set to 0, so on first execution of the ladder logic, `M90` is `false`, and I'm therefore setting it to `true`, but at the same time, I'm also setting `M91` to true, which indicates: We're initializing.
-This ensures that we trigger initialization only once on startup and this is done automatically.
+In order to trigger initialization, we're using one of the special markers `M1927`, which is only set to true on the first execution.
 
-In the `Network` `N002` you can then see: 
+So when starting, all markers are set to 0, but on first execution of the ladder logic, `M1927` is set to `true`.
+I'm using this signal to set `M90` to `true`, wich I interpret as "the system is initializing.
 
-- As long as we're still initializing (`M91` is `true`) and we haven't reached the vertical top reference switch position, set `M0` to true.
+In the `Network` `N001` you can then see: 
+
+- As long as we're initializing (`M90` is `true`) and we haven't finished (`M91` is `true`) and we haven't reached the vertical top reference switch position, set `M0` to true.
 - As soon as the top reference switch is pressed, turn off `M0`
 - Now we're in the row below, as `X3` will stay `true` and here we repeat the same procedure: As long as the horizontal reference switch is not pressed (`true` ... this is when the arm is completely retracted), turn on the `M2` motor and turn it off as soon as we reach the reference position.
 - Last not least, turn the robot arm clockwise till we reach the rotational reference position (`X11`).
@@ -213,3 +218,28 @@ The following values are positions in the Fischertechnik factory.
 | Oven Intake    |   420 |   840 |   880 |
 | Hig-Bay Ingest |    40 |    20 |  1324 |
 | Hig-Bay Output |   120 |   220 |  1324 |
+
+However, I want the robot-arm to be as flexible as possible, so I'll be implementing this program in a way that on startup via Modbus a controller will be storing the position data into registers of the PLC. 
+
+Each one being a tripple of: 
+- vertical encoder postion
+- horizontal encoder postion
+- rotational encoder postion
+
+Each of these tripples will simply be referred to by their index.
+
+So a robot arm position will be referred to as `position-number` and contain the values of:
+- Vertical postion   = R5100 + ( 3 x {`position-number`} ) + 0
+- Horizontal postion = R5100 + ( 3 x {`position-number`} ) + 1
+- Rotational postion = R5100 + ( 3 x {`position-number`} ) + 2
+
+In general the robot arm will be controlled by a controller, which generally can issue two types of commands:
+
+- `1`: Bring the arm into a position
+- `2`: Move a token from one postion to another
+- `99`: Reset to home position
+
+In order to give the arm a command, the controller first writes the source-position number into the register `R5000`.
+If it's a token move command, it also writes the target-position number into the register `R5001`.
+After that's done, the controller tells the robot arm that it's finished and what type of command it's going to execute, by writing `1` or `2` into `R5002`.
+ 
